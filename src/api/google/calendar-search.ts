@@ -39,22 +39,161 @@ export const searchCalendarEvents = async (
 			return [];
 		}
 
-		return response.data.items.map((item): EventResult => {
-			const { summary, description, htmlLink, organizer, start, end, attendees } = item;
-			return {
-				summary: summary || '',
-				description: description || '',
-				accountSource: accountName,
-				htmlLink,
-				organizer: organizer?.email || '',
-				startTime: start?.dateTime,
-				endTime: end?.dateTime,
-				attendees:
-					attendees?.map((a) => {
-						return { response: a.responseStatus, email: a.email, name: a.displayName };
-					}) || []
-			};
+		return response.data.items
+			.filter((item) => !!item.id)
+			.map((item): EventResult => {
+				const {
+					id,
+					recurringEventId,
+					summary,
+					description,
+					status,
+					eventType,
+					attachments,
+					htmlLink,
+					organizer,
+					attendees,
+					start,
+					end,
+					location,
+					conferenceData
+				} = item;
+				return {
+					id: id as string,
+					recurringId: recurringEventId,
+					summary: summary || '',
+					description: description || '',
+					status: status || '',
+					eventType: eventType || '',
+					accountSource: accountName,
+					attachments:
+						attachments
+							?.filter((a) => !!a.fileUrl)
+							.map((a) => {
+								return {
+									title: a.title,
+									mimeType: a.mimeType,
+									fileUrl: a.fileUrl as string,
+									iconUrl: a.iconLink
+								};
+							}) || [],
+					htmlLink,
+					organizer: organizer?.email || '',
+					attendees:
+						attendees
+							?.filter((a) => !!a.email)
+							.map((a) => {
+								return {
+									response: a.responseStatus,
+									email: a.email,
+									name: a.displayName
+								};
+							}) || [],
+					startTime: start?.dateTime,
+					endTime: end?.dateTime,
+					location: location || null,
+					conferenceData: {
+						solutionName: conferenceData?.conferenceSolution?.name,
+								entryPoints:
+							conferenceData?.entryPoints
+								?.filter((e) => !!e.entryPointType && !!e.uri)
+								.map((e) => ({
+									entryPointType: e.entryPointType as string,
+									label: e.label,
+									uri: e.uri as string,
+									password: e.password
+								})) || []
+					}
+				};
+			});
+	} catch (err: any) {
+		console.warn(`Cannot query calendar service ${err.message}`);
+	}
+};
+
+export const getCalendarEventById = async (
+	eventId: string,
+	{ service, accountName }: QueryOptions
+): Promise<EventResult | undefined> => {
+	try {
+		const response = await service.events.get({
+			calendarId: 'primary',
+			eventId: eventId
 		});
+
+		if (response.status !== 200) {
+			console.warn(`error querying people api ${response.statusText}`);
+			return;
+		}
+
+		if (!response.data) {
+			return;
+		}
+
+		const item = response.data;
+		const {
+			id,
+			recurringEventId,
+			summary,
+			description,
+			status,
+			eventType,
+			attachments,
+			htmlLink,
+			organizer,
+			attendees,
+			start,
+			end,
+			location,
+			conferenceData
+		} = item;
+		return {
+			id: id as string,
+			recurringId: recurringEventId,
+			summary: summary || '',
+			description: description || '',
+			status: status || '',
+			eventType: eventType || '',
+			accountSource: accountName,
+			attachments:
+				attachments
+					?.filter((a) => !!a.fileUrl)
+					.map((a) => {
+						return {
+							title: a.title,
+							mimeType: a.mimeType,
+							fileUrl: a.fileUrl as string,
+							iconUrl: a.iconLink
+						};
+					}) || [],
+			htmlLink,
+			organizer: organizer?.email || '',
+			attendees:
+				attendees
+					?.filter((a) => !!a.email)
+					.map((a) => {
+						return {
+							response: a.responseStatus,
+							email: a.email,
+							name: a.displayName
+						};
+					}) || [],
+			startTime: start?.dateTime,
+			endTime: end?.dateTime,
+			location: location || null,
+			conferenceData: {
+				solutionName: conferenceData?.conferenceSolution?.name,
+				entryPoints:
+					conferenceData?.entryPoints
+						?.filter((e) => !!e.entryPointType && !!e.uri)
+						.map((e) => ({
+							entryPointType: e.entryPointType as string,
+							label: e.label,
+							uri: e.uri as string,
+							password: e.password
+						})) || []
+			}
+		};
 	} catch (err: any) {
 		console.warn(`Cannot query calendar service ${err.message}`);
 	}
